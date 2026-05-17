@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MindTrack</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1714">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #1a1714;
+  --paper: #f5f0e8;
+  --paper2: #ede8de;
+  --good: #4a8c5c;   --good-bg: #eaf3ec;
+  --bad:  #c45c3a;   --bad-bg:  #faede9;
+  --opt:  #c4a43a;   --opt-bg:  #faf5e6;
+  --pess: #5c6e8c;   --pess-bg: #eaecf3;
+  --muted: #9a9488;
+  --border: #d8d2c6;
+  --shadow: rgba(26,23,20,0.07);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  padding: 0;
+  padding-bottom: 100px;
+}
+h2 { font-family: 'Instrument Serif', serif; font-weight: 400; }
+
+/* STATUS BAR SPACE */
+.statusbar { height: env(safe-area-inset-top, 20px); background: var(--ink); }
+
+/* TOP BAR */
+.topbar {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 16px 20px 20px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.topbar-brand { font-family: 'Instrument Serif', serif; font-size: 28px; }
+.topbar-brand em { font-style: italic; opacity: 0.5; }
+.topbar-meta { font-size: 11px; color: rgba(245,240,232,0.4); text-align: right; line-height: 1.7; }
+
+/* CONTENT */
+.content { padding: 20px 16px; display: flex; flex-direction: column; gap: 20px; }
+
+/* CARDS */
+.card {
+  background: white;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 2px 10px var(--shadow);
+}
+.card-title {
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px;
+}
+
+/* QUICK LOG */
+.quick-card {
+  background: var(--ink);
+  border-radius: 18px;
+  padding: 20px;
+  color: var(--paper);
+}
+.quick-prompt {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px; margin-bottom: 16px;
+}
+.quick-prompt em { font-style: italic; opacity: 0.5; }
+.btn-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.thought-btn {
+  border: none; border-radius: 14px;
+  padding: 16px 10px; cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  color: white;
+  transition: transform 0.12s;
+  user-select: none;
+}
+.thought-btn:active { transform: scale(0.95); }
+.thought-btn .em { font-size: 26px; line-height: 1; }
+.thought-btn.good  { background: var(--good); }
+.thought-btn.bad   { background: var(--bad); }
+.thought-btn.opt   { background: var(--opt); }
+.thought-btn.pess  { background: var(--pess); }
+
+/* TODAY BARS */
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bar-row:last-child { margin-bottom: 0; }
+.bar-label { width: 80px; font-size: 11px; display: flex; align-items: center; gap: 5px; }
+.bar-dot { width: 7px; height: 7px; border-radius: 50%; }
+.bar-track { flex: 1; height: 7px; background: var(--paper2); border-radius: 10px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 10px; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+.bar-num { font-size: 12px; color: var(--muted); width: 16px; text-align: right; }
+
+/* LOG LIST */
+.log-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 10px; margin-bottom: 6px;
+  font-size: 11px;
+}
+.log-item:last-child { margin-bottom: 0; }
+.log-item.good { background: var(--good-bg); }
+.log-item.bad  { background: var(--bad-bg); }
+.log-item.opt  { background: var(--opt-bg); }
+.log-item.pess { background: var(--pess-bg); }
+.log-time { color: var(--muted); width: 40px; flex-shrink: 0; }
+.log-type { font-weight: 500; }
+.log-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 20px; font-style: italic; }
+
+/* STATS */
+.stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat-box { background: white; border-radius: 14px; padding: 14px; box-shadow: 0 2px 8px var(--shadow); }
+.stat-val { font-family: 'Instrument Serif', serif; font-size: 30px; line-height: 1; }
+.stat-lbl { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 3px; }
+.stat-delta { font-size: 10px; margin-top: 5px; }
+.up { color: var(--good); }
+.down { color: var(--bad); }
+
+/* CHART */
+.chart-area {
+  display: flex; align-items: flex-end;
+  gap: 5px; height: 100px;
+  margin-bottom: 8px;
+}
+.chart-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; cursor: pointer; }
+.chart-seg { border-radius: 2px 2px 0 0; transition: height 0.7s cubic-bezier(0.4,0,0.2,1); min-height: 0; }
+.chart-col.today .chart-seg { filter: brightness(1.1); }
+.chart-labels { display: flex; gap: 5px; }
+.chart-lbl { flex: 1; text-align: center; font-size: 10px; color: var(--muted); }
+.chart-lbl.today { color: var(--ink); font-weight: 500; }
+.chart-legend { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--muted); }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+/* AI CARD */
+.ai-card {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 2px 10px var(--shadow);
+  border-left: 3px solid var(--ink);
+}
+.ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.ai-badge {
+  background: var(--ink); color: var(--paper);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 10px; letter-spacing: 1px;
+}
+.ai-loading { color: var(--muted); font-size: 13px; font-style: italic; padding: 12px 0; }
+.ai-text {
+  font-family: 'Instrument Serif', serif;
+  font-size: 16px; line-height: 1.7;
+  color: var(--ink);
+}
+.ai-chips { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.chip {
+  padding: 5px 12px; border-radius: 20px; font-size: 10px;
+  border: 1px solid var(--border); background: var(--paper);
+}
+.chip.pos { border-color: var(--good); color: var(--good); background: var(--good-bg); }
+.chip.neg { border-color: var(--bad); color: var(--bad); background: var(--bad-bg); }
+.ai-refresh {
+  font-size: 10px; color: var(--muted); letter-spacing: 1px;
+  text-transform: uppercase; cursor: pointer; border: none;
+  background: none; font-family: 'DM Mono', monospace;
+  padding: 6px 0; text-decoration: underline;
+}
+
+/* BOTTOM NAV */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: white;
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 50;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+  padding: 10px 0; cursor: pointer;
+  font-size: 10px; color: var(--muted);
+  text-decoration: none;
+}
+.nav-item.active { color: var(--ink); }
+.nav-icon { font-size: 20px; }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 80px; left: 50%;
+  transform: translateX(-50%) translateY(30px);
+  background: var(--ink); color: var(--paper);
+  padding: 10px 22px; border-radius: 30px;
+  font-size: 12px; opacity: 0;
+  transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  pointer-events: none; z-index: 100; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.card, .quick-card, .stats-row, .ai-card { animation: fadeUp 0.4s ease both; }
+</style>
+</head>
+<body>
+
+<div class="statusbar"></div>
+<div class="topbar">
+  <div class="topbar-brand">Mind<em>Track</em></div>
+  <div class="topbar-meta">
+    <div id="top-date"></div>
+    <div id="top-streak"></div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- QUICK LOG -->
+  <div class="quick-card">
+    <div class="quick-prompt">Milyen gondolat<em> tölt el most?</em></div>
+    <div class="btn-grid">
+      <button class="thought-btn good"  onclick="logThought('good')"><span class="em">😊</span><span>Jó</span></button>
+      <button class="thought-btn bad"   onclick="logThought('bad')"><span class="em">😟</span><span>Rossz</span></button>
+      <button class="thought-btn opt"   onclick="logThought('opt')"><span class="em">🌟</span><span>Optimista</span></button>
+      <button class="thought-btn pess"  onclick="logThought('pess')"><span class="em">🌧</span><span>Pesszimista</span></button>
+    </div>
+  </div>
+
+  <!-- TODAY -->
+  <div class="card">
+    <div class="card-title">Mai megoszlás</div>
+    <div class="bar-row"><div class="bar-label"><div class="bar-dot" style="background:var(--good)"></div>Jó</div><div class="bar-track"><div class="bar-fill" id="bar-good" style="width:0%;background:var(--good)"></div></div><div class="bar-num" id="n-good">0</div></div>
+    <div class="bar-row"><div class="bar-label"><div class="bar-dot" style="background:var(--bad)"></div>Rossz</div><div class="bar-track"><div class="bar-fill" id="bar-bad" style="width:0%;background:var(--bad)"></div></div><div class="bar-num" id="n-bad">0</div></div>
+    <div class="bar-row"><div class="bar-label"><div class="bar-dot" style="background:var(--opt)"></div>Optimista</div><div class="bar-track"><div class="bar-fill" id="bar-opt" style="width:0%;background:var(--opt)"></div></div><div class="bar-num" id="n-opt">0</div></div>
+    <div class="bar-row"><div class="bar-label"><div class="bar-dot" style="background:var(--pess)"></div>Pesszimista</div><div class="bar-track"><div class="bar-fill" id="bar-pess" style="width:0%;background:var(--pess)"></div></div><div class="bar-num" id="n-pess">0</div></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-val" id="s-pos">–</div>
+      <div class="stat-lbl">Pozitív arány</div>
+      <div class="stat-delta up" id="s-pos-d"></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="s-streak">0</div>
+      <div class="stat-lbl">Napos sorozat</div>
+      <div class="stat-delta" id="s-streak-d"></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="s-total">0</div>
+      <div class="stat-lbl">Heti bejegyzés</div>
+      <div class="stat-delta" id="s-total-d"></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="s-best">–</div>
+      <div class="stat-lbl">Legtöbb ma</div>
+      <div class="stat-delta" id="s-best-d"></div>
+    </div>
+  </div>
+
+  <!-- WEEKLY CHART -->
+  <div class="card">
+    <div class="card-title">Heti trend</div>
+    <div class="chart-area" id="chart"></div>
+    <div class="chart-labels" id="chart-labels"></div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--good)"></div>Jó</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--bad)"></div>Rossz</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--opt)"></div>Optimista</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--pess)"></div>Pesszimista</div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card">
+    <div class="card-title">Mai bejegyzések</div>
+    <div id="log-list"></div>
+  </div>
+
+  <!-- AI -->
+  <div class="ai-card">
+    <div class="ai-header">
+      <div class="ai-badge">✦ AI Elemzés</div>
+      <button class="ai-refresh" onclick="loadAI()">↻ Frissítés</button>
+    </div>
+    <div id="ai-content"><div class="ai-loading">Elemzés betöltése...</div></div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <a class="nav-item active" href="index.html"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+  <a class="nav-item" href="widget.html"><span class="nav-icon">✦</span><span>Rögzítés</span></a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="storage.js"></script>
+<script>
+const emojis = {good:'😊',bad:'😟',opt:'🌟',pess:'🌧'};
+const labels = {good:'Jó',bad:'Rossz',opt:'Optimista',pess:'Pesszimista'};
+const colors = {good:'var(--good)',bad:'var(--bad)',opt:'var(--opt)',pess:'var(--pess)'};
+
+function logThought(type) {
+  MT.save(type);
+  updateAll();
+  showToast(emojis[type] + ' ' + labels[type] + ' rögzítve');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function updateAll() {
+  const today = MT.today();
+  const total = today.length;
+  const counts = {good:0,bad:0,opt:0,pess:0};
+  today.forEach(e => counts[e.type]++);
+
+  // Bars
+  ['good','bad','opt','pess'].forEach(t => {
+    const pct = total ? Math.round(counts[t]/total*100) : 0;
+    document.getElementById('bar-'+t).style.width = pct + '%';
+    document.getElementById('n-'+t).textContent = counts[t];
+  });
+
+  // Stats
+  const posCount = counts.good + counts.opt;
+  const posPct = total ? Math.round(posCount/total*100) : 0;
+  document.getElementById('s-pos').textContent = posPct + '%';
+
+  const streak = MT.streak();
+  document.getElementById('s-streak').textContent = streak;
+  document.getElementById('s-streak-d').textContent = streak > 0 ? '🔥 aktív' : '';
+
+  const weekTotal = MT.lastDays(7).reduce((s,d) => s + d.good+d.bad+d.opt+d.pess, 0);
+  document.getElementById('s-total').textContent = weekTotal;
+
+  // Best today
+  const bestType = ['good','bad','opt','pess'].reduce((a,b) => counts[a]>=counts[b]?a:b);
+  document.getElementById('s-best').textContent = total > 0 ? emojis[bestType] : '–';
+  document.getElementById('s-best-d').textContent = total > 0 ? labels[bestType] : '';
+
+  // Log
+  const logEl = document.getElementById('log-list');
+  if (today.length === 0) {
+    logEl.innerHTML = '<div class="log-empty">Még nincs mai bejegyzés</div>';
+  } else {
+    logEl.innerHTML = [...today].reverse().slice(0,8).map(e =>
+      `<div class="log-item ${e.type}">
+        <span class="log-time">${e.time}</span>
+        <span>${emojis[e.type]}</span>
+        <span class="log-type">${labels[e.type]}</span>
+      </div>`
+    ).join('');
+  }
+
+  // Chart
+  buildChart();
+}
+
+function buildChart() {
+  const days = MT.lastDays(7);
+  const maxT = Math.max(...days.map(d => d.good+d.bad+d.opt+d.pess), 1);
+  const ch = 90;
+  const chart = document.getElementById('chart');
+  const clbls = document.getElementById('chart-labels');
+  const todayDate = new Date().toISOString().slice(0,10);
+
+  chart.innerHTML = '';
+  clbls.innerHTML = '';
+
+  days.forEach(d => {
+    const isToday = d.date === todayDate;
+    const col = document.createElement('div');
+    col.className = 'chart-col' + (isToday ? ' today' : '');
+
+    ['pess','opt','bad','good'].forEach(type => {
+      if (d[type] > 0) {
+        const seg = document.createElement('div');
+        seg.className = 'chart-seg';
+        seg.style.height = (d[type]/maxT * ch) + 'px';
+        seg.style.background = `var(--${type})`;
+        if (!isToday) seg.style.opacity = '0.45';
+        col.appendChild(seg);
+      }
+    });
+    chart.appendChild(col);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'chart-lbl' + (isToday ? ' today' : '');
+    lbl.textContent = d.label;
+    clbls.appendChild(lbl);
+  });
+}
+
+// Date header
+function updateHeader() {
+  const now = new Date();
+  const days = ['vasárnap','hétfő','kedd','szerda','csütörtök','péntek','szombat'];
+  document.getElementById('top-date').textContent =
+    now.getFullYear() + '. ' + (now.getMonth()+1) + '. ' + now.getDate() + '.';
+  document.getElementById('top-streak').textContent =
+    '🔥 ' + MT.streak() + ' napos sorozat';
+}
+
+// AI Analysis
+async function loadAI() {
+  const el = document.getElementById('ai-content');
+  el.innerHTML = '<div class="ai-loading">Elemzés folyamatban...</div>';
+
+  const days = MT.lastDays(7);
+  const total = days.reduce((s,d) => s+d.good+d.bad+d.opt+d.pess, 0);
+
+  if (total === 0) {
+    el.innerHTML = '<div class="ai-loading">Még nincs elég adat az elemzéshez. Rögzíts néhány gondolatot!</div>';
+    return;
+  }
+
+  const summary = days.map(d =>
+    `${d.label}: jó=${d.good}, rossz=${d.bad}, optimista=${d.opt}, pesszimista=${d.pess}`
+  ).join('\n');
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: `Te egy empatikus mentális wellness coach vagy. A felhasználó gondolat-naplójának adatai alapján rövid, személyes, pozitív hangú elemzést adsz magyarul. Max 3-4 mondat. Utána adj 3-4 rövid insight chip-et JSON formátumban, így: {"text":"...","type":"pos"/"neg"/"neutral"}. Válaszolj kizárólag így: SZOVEG|||[{...},{...}]`,
+        messages: [{ role: 'user', content: `Heti gondolat adataim:\n${summary}` }]
+      })
+    });
+
+    const data = await resp.json();
+    const raw = data.content[0].text;
+    const parts = raw.split('|||');
+    const text = parts[0].trim();
+    let chips = [];
+    try { chips = JSON.parse(parts[1]); } catch {}
+
+    el.innerHTML = `
+      <div class="ai-text">${text}</div>
+      <div class="ai-chips">
+        ${chips.map(c => `<div class="chip ${c.type}">${c.text}</div>`).join('')}
+      </div>
+    `;
+  } catch(e) {
+    el.innerHTML = '<div class="ai-loading">Az elemzés most nem elérhető. Próbáld újra később.</div>';
+  }
+}
+
+// SW
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+updateHeader();
+updateAll();
+loadAI();
+</script>
+</body>
+</html>

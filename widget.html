@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MindTrack · Widget</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1714">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  height: 100%; width: 100%;
+  background: #1a1714;
+  color: #f5f0e8;
+  font-family: 'DM Mono', monospace;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+
+.widget-wrap {
+  width: 100%; max-width: 360px;
+  padding: 28px 24px 32px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 24px;
+}
+
+.logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 15px;
+  color: rgba(245,240,232,0.35);
+  letter-spacing: 1px;
+}
+
+.prompt {
+  font-family: 'Instrument Serif', serif;
+  font-size: 26px;
+  text-align: center;
+  line-height: 1.3;
+  color: #f5f0e8;
+}
+.prompt em { font-style: italic; color: rgba(245,240,232,0.5); }
+
+.btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.thought-btn {
+  border: none;
+  border-radius: 20px;
+  padding: 22px 12px;
+  cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: white;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.thought-btn:active { transform: scale(0.94); filter: brightness(0.9); }
+.thought-btn .emoji { font-size: 32px; line-height: 1; }
+.thought-btn.good  { background: #4a8c5c; }
+.thought-btn.bad   { background: #c45c3a; }
+.thought-btn.opt   { background: #c4a43a; }
+.thought-btn.pess  { background: #5c6e8c; }
+
+.meta-row {
+  display: flex; justify-content: space-between;
+  width: 100%;
+  font-size: 11px;
+  color: rgba(245,240,232,0.3);
+}
+
+.dashboard-link {
+  font-size: 11px;
+  color: rgba(245,240,232,0.25);
+  text-decoration: none;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(245,240,232,0.1);
+  padding-bottom: 2px;
+}
+
+/* CONFIRM FLASH */
+.confirm {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+.confirm.show { opacity: 1; pointer-events: none; }
+.confirm-emoji { font-size: 72px; }
+.confirm-label {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  color: #f5f0e8;
+}
+.confirm-sub { font-size: 11px; color: rgba(245,240,232,0.4); }
+</style>
+</head>
+<body>
+
+<div class="widget-wrap" id="main">
+  <div class="logo">MindTrack</div>
+  <div class="prompt">Milyen gondolat<em> tölt el most?</em></div>
+
+  <div class="btn-grid">
+    <button class="thought-btn good"  onclick="log('good')"><span class="emoji">😊</span><span>Jó</span></button>
+    <button class="thought-btn bad"   onclick="log('bad')"><span class="emoji">😟</span><span>Rossz</span></button>
+    <button class="thought-btn opt"   onclick="log('opt')"><span class="emoji">🌟</span><span>Optimista</span></button>
+    <button class="thought-btn pess"  onclick="log('pess')"><span class="emoji">🌧</span><span>Pesszimista</span></button>
+  </div>
+
+  <div class="meta-row">
+    <span id="streak-lbl">Sorozat: –</span>
+    <span id="today-lbl">Ma: 0 bejegyzés</span>
+  </div>
+
+  <a href="index.html" class="dashboard-link">→ Dashboard</a>
+</div>
+
+<div class="confirm" id="confirm">
+  <div class="confirm-emoji" id="c-emoji"></div>
+  <div class="confirm-label" id="c-label"></div>
+  <div class="confirm-sub" id="c-sub"></div>
+</div>
+
+<script src="storage.js"></script>
+<script>
+const labels = {good:'Jó',bad:'Rossz',opt:'Optimista',pess:'Pesszimista'};
+const emojis = {good:'😊',bad:'😟',opt:'🌟',pess:'🌧'};
+const colors = {good:'#4a8c5c',bad:'#c45c3a',opt:'#c4a43a',pess:'#5c6e8c'};
+
+function updateMeta() {
+  const today = MT.today();
+  document.getElementById('today-lbl').textContent = `Ma: ${today.length} bejegyzés`;
+  document.getElementById('streak-lbl').textContent = `Sorozat: ${MT.streak()} nap`;
+}
+
+function log(type) {
+  MT.save(type);
+  updateMeta();
+
+  const today = MT.today();
+  const c = document.getElementById('confirm');
+  document.getElementById('c-emoji').textContent = emojis[type];
+  document.getElementById('c-label').textContent = labels[type] + ' gondolat rögzítve';
+  document.getElementById('c-sub').textContent = `Ma összesen: ${today.length} bejegyzés`;
+  document.body.style.background = colors[type];
+  c.classList.add('show');
+
+  setTimeout(() => {
+    c.classList.remove('show');
+    document.body.style.background = '#1a1714';
+  }, 1200);
+}
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+updateMeta();
+</script>
+</body>
+</html>
