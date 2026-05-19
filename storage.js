@@ -3,7 +3,7 @@ const MT = {
   KEY: 'mindtrack_entries',
 
   save(type) {
-    const entries = MT.load();
+    let entries = MT.load();
     const now = new Date();
     entries.push({
       type,
@@ -11,6 +11,11 @@ const MT = {
       date: now.toISOString().slice(0,10),
       time: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0')
     });
+    // Prune entries older than 365 days to prevent localStorage overflow
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 365);
+    const cutoffStr = cutoff.toISOString().slice(0,10);
+    entries = entries.filter(e => e.date >= cutoffStr);
     localStorage.setItem(MT.KEY, JSON.stringify(entries));
     return entries;
   },
@@ -25,11 +30,12 @@ const MT = {
   },
 
   lastDays(n) {
+    const allEntries = MT.load(); // load once, not n times
     const days = [];
     for (let i = n-1; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0,10);
-      const entries = MT.load().filter(e => e.date === key);
+      const entries = allEntries.filter(e => e.date === key);
       const label = ['V','H','K','Sze','Cs','P','Szo'][d.getDay()];
       days.push({ date: key, label, entries,
         good: entries.filter(e=>e.type==='good').length,
@@ -47,6 +53,11 @@ const MT = {
     const dates = [...new Set(entries.map(e => e.date))].sort().reverse();
     let streak = 0;
     let check = new Date();
+    // If today has no entries yet, don't break a streak from yesterday
+    const todayKey = check.toISOString().slice(0,10);
+    if (!dates.includes(todayKey)) {
+      check.setDate(check.getDate() - 1);
+    }
     for (const d of dates) {
       const expected = check.toISOString().slice(0,10);
       if (d === expected) { streak++; check.setDate(check.getDate()-1); }
@@ -57,5 +68,21 @@ const MT = {
 
   count(type, days = 7) {
     return MT.lastDays(days).reduce((s, d) => s + d[type], 0);
+  },
+
+  exportJSON() {
+    const data = { version: 1, exported: new Date().toISOString(), entries: MT.load() };
+    return JSON.stringify(data, null, 2);
+  },
+
+  importJSON(jsonStr) {
+    const data = JSON.parse(jsonStr);
+    if (!Array.isArray(data.entries)) throw new Error('Érvénytelen formátum');
+    const existing = MT.load();
+    const existingTs = new Set(existing.map(e => e.ts));
+    const merged = [...existing, ...data.entries.filter(e => !existingTs.has(e.ts))];
+    merged.sort((a, b) => a.ts - b.ts);
+    localStorage.setItem(MT.KEY, JSON.stringify(merged));
+    return merged.length;
   }
 };

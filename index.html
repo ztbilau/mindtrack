@@ -211,6 +211,17 @@ h2 { font-family: 'Instrument Serif', serif; font-weight: 400; }
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* DATA TOOLS */
+.data-tools { display: flex; gap: 10px; }
+.tool-btn {
+  flex: 1; padding: 11px 8px; border-radius: 12px;
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  cursor: pointer; border: 1px solid var(--border);
+  background: var(--paper); color: var(--ink);
+  letter-spacing: 0.5px;
+}
+.tool-btn:active { opacity: 0.7; }
+
 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 .card, .quick-card, .stats-row, .ai-card { animation: fadeUp 0.4s ease both; }
 </style>
@@ -298,6 +309,16 @@ h2 { font-family: 'Instrument Serif', serif; font-weight: 400; }
       <button class="ai-refresh" onclick="loadAI()">↻ Frissítés</button>
     </div>
     <div id="ai-content"><div class="ai-loading">Elemzés betöltése...</div></div>
+  </div>
+
+  <!-- DATA TOOLS -->
+  <div class="card">
+    <div class="card-title">Adatok</div>
+    <div class="data-tools">
+      <button class="tool-btn" onclick="exportData()">&#11015; Export JSON</button>
+      <button class="tool-btn" onclick="document.getElementById('import-input').click()">&#11014; Import JSON</button>
+    </div>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
   </div>
 
 </div>
@@ -423,6 +444,10 @@ function updateHeader() {
 }
 
 // AI Analysis
+// NOTE: Direct API calls from the browser expose your key publicly.
+// For production use a backend proxy. Set your key here only for local/private testing.
+const ANTHROPIC_API_KEY = ''; // <-- set your key here for local testing only
+
 async function loadAI() {
   const el = document.getElementById('ai-content');
   el.innerHTML = '<div class="ai-loading">Elemzés folyamatban...</div>';
@@ -442,7 +467,12 @@ async function loadAI() {
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -451,6 +481,8 @@ async function loadAI() {
       })
     });
 
+    if (!resp.ok) throw new Error('API hiba: ' + resp.status);
+
     const data = await resp.json();
     const raw = data.content[0].text;
     const parts = raw.split('|||');
@@ -458,15 +490,58 @@ async function loadAI() {
     let chips = [];
     try { chips = JSON.parse(parts[1]); } catch {}
 
-    el.innerHTML = `
-      <div class="ai-text">${text}</div>
-      <div class="ai-chips">
-        ${chips.map(c => `<div class="chip ${c.type}">${c.text}</div>`).join('')}
-      </div>
-    `;
+    // Build DOM safely to prevent XSS from API response
+    const container = document.createDocumentFragment();
+    const textEl = document.createElement('div');
+    textEl.className = 'ai-text';
+    textEl.textContent = text;
+    container.appendChild(textEl);
+    if (chips.length) {
+      const chipsEl = document.createElement('div');
+      chipsEl.className = 'ai-chips';
+      const allowedTypes = new Set(['pos', 'neg', 'neutral']);
+      chips.forEach(c => {
+        const chip = document.createElement('div');
+        chip.className = 'chip' + (allowedTypes.has(c.type) ? ' ' + c.type : '');
+        chip.textContent = c.text;
+        chipsEl.appendChild(chip);
+      });
+      container.appendChild(chipsEl);
+    }
+    el.innerHTML = '';
+    el.appendChild(container);
   } catch(e) {
     el.innerHTML = '<div class="ai-loading">Az elemzés most nem elérhető. Próbáld újra később.</div>';
   }
+}
+
+function exportData() {
+  const json = MT.exportJSON();
+  const blob = new Blob([json], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mindtrack-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('\u2713 Export k�sz');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const count = MT.importJSON(ev.target.result);
+      updateAll();
+      showToast('\u2713 ' + count + ' bejegyz�s bet�ltve');
+    } catch {
+      showToast('\u2717 �rv�nytelen f�jl');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 }
 
 // SW
